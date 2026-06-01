@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <!-- Include the ECharts file you just downloaded -->
+    <script src="echarts.min.js"></script>
+    <style>
+        form.form-example {
+            display: table;
+        }
+
+        div.form-example {
+            display: table-row;
+        }
+
+        label,
+        input {
+            display: table-cell;
+        }
+
+        label {
+            padding-right: 10px;
+            vertical-align: middle;
+        }
+    </style>
+    <title>Spinner Plots</title>
+</head>
+
+<body>
+    <form class="form-example">
+        <div class="form-example">
+            <label for="min_j">Min J</label><input type="range" name="min_j" id="min_j" min="0.1" max="5" step="0.01" />
+        </div>
+        <div class="form-example">
+            <label for="mid_j">Median J</label><input type="range" name="mid_j" id="mid_j" min="0" max="1"
+                step="0.01" />
+        </div>
+        <div class="form-example">
+            <label for="energy">Energy</label><input type="range" name="energy" id="energy" min="0" max="1" step="0.01"
+                value="0.25" />
+        </div>
+        <div class="form-example">
+            <label for="resolution">Time Subdivision</label><select name="resolution" id="resolution">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div class="form-example"><button type="button" id="run_button">Run</button></div>
+    </form>
+
+    <div id="main" style="width: 100%; height:600px;"></div>
+
+    <script type="module">
+        // Use ES module import syntax to import functionality from the module
+        // that we have compiled.
+        //
+        // Note that the `default` import is an initialization function which
+        // will "boot" the module and make it ready to use. Currently browsers
+        // don't support natively imported WebAssembly as an ES module, but
+        // eventually the manual initialization won't be required!
+        import init, { run } from './pkg/spin_analysis.js';
+
+        async function setup() {
+            // First up we need to actually load the Wasm file, so we use the
+            // default export to inform it where the Wasm file is located on the
+            // server, and then we wait on the returned promise to wait for the
+            // Wasm to be loaded.
+            //
+            // It may look like this: `await init('./without_a_bundler_bg.wasm');`,
+            // but there is also a handy default inside `init` function, which uses
+            // `import.meta` to locate the Wasm file relatively to js file.
+            //
+            // Note that instead of a string you can also pass in any of the
+            // following things:
+            //
+            // * `WebAssembly.Module`
+            //
+            // * `ArrayBuffer`
+            //
+            // * `Response`
+            //
+            // * `Promise` which returns any of the above, e.g. `fetch("./path/to/wasm")`
+            //
+            // This gives you complete control over how the module is loaded
+            // and compiled.
+            //
+            // Also note that the promise, when resolved, yields the Wasm module's
+            // exports which is the same as importing the `*_bg` module in other
+            // modes
+            await init();
+
+            // Initialize the echarts instance based on the prepared dom
+            var myChart = echarts.init(document.getElementById('main'));
+
+
+            // And afterwards we can use all the functionality defined in wasm.
+            const button = document.getElementById("run_button");
+            button.addEventListener("click", () => {
+                console.log("run");
+
+                const j_min = document.getElementById("min_j").valueAsNumber;
+                const j_mid = document.getElementById("mid_j").valueAsNumber;
+                const energy = document.getElementById("energy").valueAsNumber;
+                const resolution = parseInt(document.getElementById("resolution").value);
+
+                let series = [];
+                let datasets = [];
+
+                for (var method of ["explicit", "jolt", "naive_rotation", "proposed_momentum", "proposed_velocity"]) {
+                    var results = run(j_min, j_mid, energy, resolution, method);
+
+                    function* chunks(arr, n) {
+                        for (let i = 0; i < arr.length; i += n) {
+                            yield arr.slice(i, i + n);
+                        }
+                    }
+
+                    var data = [
+                        [
+                            "t",
+                            "X",
+                            "Y",
+                            "Z",
+                            "x",
+                            "y",
+                            "z",
+                            "L",
+                            "J_L",
+                            "J_k"
+                        ],
+                        ...chunks(results, 10)
+                    ];
+
+                    function* radial(arr, xi, yi) {
+                        for (let i = 1; i < arr.length; i += 1) {
+                            var e = arr[i];
+                            yield [Math.sqrt(e[xi] * e[xi] + e[yi] * e[yi]), Math.atan2(e[yi], e[xi])];
+                        }
+                    }
+
+                    let world_momentum_transverse = [
+                        ['radius', 'angle'],
+                        ...radial(data, 1, 2)
+                    ];
+
+                    let body_yz = [
+                        ['radius', 'angle'],
+                        ...radial(data, 5, 6)
+                    ];
+
+                    let body_xz = [
+                        ['radius', 'angle'],
+                        ...radial(data, 4, 6)
+                    ];
+
+                    let body_xy = [
+                        ['radius', 'angle'],
+                        ...radial(data, 4, 5)
+                    ];
+
+
+                    series.push(
+                        {
+                            name: method,
+                            type: 'line',
+                            datasetIndex: datasets.length,
+                            xAxisIndex: 0,
+                            yAxisIndex: 0,
+                            showSymbol: false,
+                            encode: { x: 't', y: 'J_L' },
+
+                        },
+                        {
+                            name: method,
+                            type: 'line',
+                            datasetIndex: datasets.length,
+                            xAxisIndex: 1,
+                            yAxisIndex: 1,
+                            showSymbol: false,
+                            encode: { x: 't', y: 'L' },
+                        },
+                        {
+                            name: method,
+                            type: 'line',
+                            data: world_momentum_transverse,
+                            coordinateSystem: 'polar',
+                            polarIndex: 0,
+                            showSymbol: false,
+                        },
+                        {
+                            name: method,
+                            type: 'line',
+                            data: body_xy,
+                            coordinateSystem: 'polar',
+                            polarIndex: 1,
+                            showSymbol: false,
+                        },
+                        {
+                            name: method,
+                            type: 'line',
+                            data: body_yz,
+                            coordinateSystem: 'polar',
+                            polarIndex: 2,
+                            showSymbol: false,
+                        },
+                        {
+                            name: method,
+                            type: 'line',
+                            data: body_xz,
+                            coordinateSystem: 'polar',
+                            polarIndex: 3,
+                            showSymbol: false,
+                        },
+                    );
+
+                    datasets.push({ source: data });
+
+                }
+
+
+                // Specify the configuration items and data for the chart
+                var option = {
+                    title: [
+                        { title: "xy" }
+                    ],
+                    dataset: datasets,
+                    grid: [
+                        { bottom: '55%', left: '0%', right: '70%' },
+                        { bottom: '55%', left: '35%', right: '35%' },
+                    ],
+                    polar: [
+                        { center: ['15%', '70%'], radius: '30%', tooltip: { show: false } },
+                        { center: ['85%', '30%'], radius: '30%', tooltip: { show: false } },
+                        { center: ['50%', '70%'], radius: '30%', tooltip: { show: false } },
+                        { center: ['85%', '70%'], radius: '30%', tooltip: { show: false } },
+                    ],
+                    xAxis: [
+                        { gridIndex: 0 },
+                        { gridIndex: 1 }
+                    ],
+                    yAxis: [
+                        { gridIndex: 0, scale: true, name: "Energy Factor" },
+                        { gridIndex: 1, scale: true, name: "|Momentum|", }
+                    ],
+                    angleAxis: [
+                        { polarIndex: 0, type: 'value', startAngle: 0.0, clockwise: false, min: 0.0, max: 2 * Math.PI },
+                        { polarIndex: 1, type: 'value', startAngle: 0.0, clockwise: false, min: 0.0, max: 2 * Math.PI },
+                        { polarIndex: 2, type: 'value', startAngle: 0.0, clockwise: false, min: 0.0, max: 2 * Math.PI },
+                        { polarIndex: 3, type: 'value', startAngle: 0.0, clockwise: false, min: 0.0, max: 2 * Math.PI },
+                    ],
+                    radiusAxis: [
+                        { polarIndex: 0, type: 'value', min: 0.0, axisPointer: { show: true, snap: false, triggerTooltip: false } },
+                        { polarIndex: 1, type: 'value', min: 0.0, max: 1.0 },
+                        { polarIndex: 2, type: 'value', min: 0.0, max: 1.0 },
+                        { polarIndex: 3, type: 'value', min: 0.0, max: 1.0 },
+                    ],
+                    legend: {
+                        top: '90%',
+                    },
+
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            xAxisIndex: [0, 1],
+                            top: '0%',
+                            bottom: '95%',
+                            left: '5%',
+                            right: '40%'
+                        }
+                    ],
+                    tooltip: {
+                        trigger: 'axis',
+                    },
+                    series: series
+                };
+
+                // Display the chart using the configuration and the data defined above.
+                myChart.setOption(option);
+            });
+        }
+
+        setup();
+    </script>
+</body>
+
+</html>
