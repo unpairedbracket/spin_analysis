@@ -227,7 +227,10 @@
                 // Specify the configuration items and data for the chart
                 var option = {
                     title: [
-                        { title: "xy" }
+                        { text: "lx:ly", top: "10%", left: "90%" },
+                        { text: "Lx:Ly", top: "50%", left: "20%" },
+                        { text: "ly:lz", top: "50%", left: "55%" },
+                        { text: "lx:lz", top: "50%", left: "90%" },
                     ],
                     dataset: datasets,
                     grid: [
@@ -241,8 +244,8 @@
                         { center: ['85%', '70%'], radius: '30%', tooltip: { show: false } },
                     ],
                     xAxis: [
-                        { gridIndex: 0 },
-                        { gridIndex: 1 }
+                        { gridIndex: 0, name: "t" },
+                        { gridIndex: 1, name: "t" }
                     ],
                     yAxis: [
                         { gridIndex: 0, scale: true, name: "Energy Factor" },
