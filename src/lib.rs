@@ -6,7 +6,9 @@ use glam::{Mat3, Quat, Vec3};
 use std::f32;
 
 use crate::integrators::{
-    update_explicit, update_jolt, update_naive_rotation, update_proposed, update_proposed_velocity,
+    update_buss1, update_buss2, update_buss2a, update_buss2e, update_buss2ea, update_buss3a,
+    update_explicit, update_implicit, update_jolt, update_naive_rotation, update_proposed,
+    update_proposed_velocity,
 };
 
 fn run_analysis(
@@ -88,6 +90,13 @@ pub fn run(
         "naive_rotation" => update_naive_rotation,
         "proposed_momentum" => update_proposed,
         "proposed_velocity" => update_proposed_velocity,
+        "catto_implicit" => update_implicit,
+        "buss1" => update_buss1,
+        "buss2" => update_buss2,
+        "buss2a" => update_buss2a,
+        "buss2e" => update_buss2e,
+        "buss2ea" => update_buss2ea,
+        "buss3a" => update_buss3a,
         _ => update_explicit,
     };
     let results = run_analysis(min_over_range, j2_fraction, energy_fraction, res_t, update);

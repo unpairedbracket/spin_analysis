@@ -112,7 +112,7 @@
                 let series = [];
                 let datasets = [];
 
-                for (var method of ["explicit", "jolt", "naive_rotation", "proposed_momentum", "proposed_velocity"]) {
+                for (var method of ["explicit", "catto_implicit", "jolt", "naive_rotation", "proposed_momentum", "proposed_velocity"]) {
                     var results = run(j_min, j_mid, energy, resolution, method);
 
                     function* chunks(arr, n) {
