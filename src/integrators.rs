@@ -93,10 +93,39 @@ pub fn update_proposed_velocity(q: Quat, J: Mat3, world_momentum: Vec3, dt: f32)
     (q1, world_l_out)
 }
 
-pub fn update_buss1(q: Quat, J: Mat3, world_momentum: Vec3, dt: f32) -> (Quat, Vec3) {
+pub fn update_proposed_velocity2(q: Quat, J: Mat3, world_momentum: Vec3, dt: f32) -> (Quat, Vec3) {
     let body_l0 = q.inverse() * world_momentum;
     let body_w = J * body_l0;
     let k = body_w.cross(body_l0);
+
+    let k2 = k.length_squared();
+
+    let body_l1 = if k2 > 1e-8 {
+        let j_k = k.dot(J * k) / k2;
+        let omega = body_w - j_k * body_l0;
+        approx_rotation(-omega * dt, body_l0)
+    } else {
+        body_l0
+    };
+
+    let body_w1 = J * body_l1;
+    let world_l1 = q * body_l1;
+    let world_w1 = q * body_w1;
+    let q_step = Quat::from_scaled_axis(world_w1 * dt);
+    let q1 = q_step * q;
+    let world_l_out = q_step * world_l1;
+    (q1, world_l_out)
+}
+
+fn approx_rotation(scaled_axis: Vec3, vec: Vec3) -> Vec3 {
+    let half_vec = 0.5 * scaled_axis;
+    let k = half_vec.cross(vec);
+    vec + 2.0 * (k + half_vec.cross(k)) / (1.0 + half_vec.length_squared())
+}
+
+pub fn update_buss1(q: Quat, J: Mat3, world_momentum: Vec3, dt: f32) -> (Quat, Vec3) {
+    let body_l0 = q.inverse() * world_momentum;
+    let body_w = J * body_l0;
 
     let body_wbar = body_w;
 

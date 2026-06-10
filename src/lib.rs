@@ -5,11 +5,7 @@ use wasm_bindgen::prelude::*;
 use glam::{Mat3, Quat, Vec3};
 use std::f32;
 
-use crate::integrators::{
-    update_buss1, update_buss2, update_buss2a, update_buss2e, update_buss2ea, update_buss3a,
-    update_explicit, update_implicit, update_jolt, update_naive_rotation, update_proposed,
-    update_proposed_velocity,
-};
+use crate::integrators::*;
 
 fn run_analysis(
     min_over_range: f32,
@@ -90,6 +86,7 @@ pub fn run(
         "naive_rotation" => update_naive_rotation,
         "proposed_momentum" => update_proposed,
         "proposed_velocity" => update_proposed_velocity,
+        "proposed_velocity2" => update_proposed_velocity2,
         "catto_implicit" => update_implicit,
         "buss1" => update_buss1,
         "buss2" => update_buss2,
