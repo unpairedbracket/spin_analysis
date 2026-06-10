@@ -31,6 +31,7 @@ fn run_analysis(
 
     while t < 20.0 * f32::consts::TAU {
         (orientation, world_momentum) = update(orientation, inv_inertia, world_momentum, dt);
+        orientation = orientation.normalize();
         t += dt;
         states.push(State::new(t, world_momentum, inv_inertia, orientation));
     }
